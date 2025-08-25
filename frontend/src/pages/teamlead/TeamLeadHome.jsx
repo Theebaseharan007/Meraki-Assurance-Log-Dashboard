@@ -69,17 +69,23 @@ const TeamLeadHome = () => {
   // Format selected date for API call (YYYY-MM-DD)
   const formattedDate = selectedDate ? selectedDate.toISOString().split('T')[0] : null;
 
-  // Fetch ALL submissions for stats calculation (no pagination)
-  const { data: allSubmissionsData, isLoading: allSubmissionsLoading } = useQuery({
-    queryKey: ['my-all-submissions'],
-    queryFn: () => submissionAPI.getMine({ page: 1, limit: 1000 }), // Get all submissions
+  // Fetch ALL submissions for stats calculation based on selected date
+  const { data: statsSubmissionsData, isLoading: statsSubmissionsLoading } = useQuery({
+    queryKey: ['my-stats-submissions', { date: formattedDate }],
+    queryFn: () => {
+      const params = { page: 1, limit: 1000 }; // Get all submissions for stats
+      if (formattedDate) {
+        params.date = formattedDate;
+      }
+      return submissionAPI.getMine(params);
+    },
     onError: (err) => {
       error('Failed to load submissions data');
-      console.error('All submissions fetch error:', err);
+      console.error('Stats submissions fetch error:', err);
     }
   });
 
-  // Fetch recent submissions for the selected date
+  // Fetch recent submissions for the selected date (for display)
   const { data: submissionsData, isLoading: submissionsLoading } = useQuery({
     queryKey: ['my-submissions', { page: 1, limit: 5, date: formattedDate }],
     queryFn: () => {
@@ -98,16 +104,17 @@ const TeamLeadHome = () => {
   const submissions = submissionsData?.data?.data?.submissions || [];
   const pagination = submissionsData?.data?.data?.pagination || {};
   
-  // Get ALL submissions for stats calculation
-  const allSubmissions = allSubmissionsData?.data?.data?.submissions || [];
+  // Get date-filtered submissions for stats calculation
+  const statsSubmissions = statsSubmissionsData?.data?.data?.submissions || [];
+  const statsPagination = statsSubmissionsData?.data?.data?.pagination || {};
 
-  // Calculate stats from ALL submissions (not just recent/filtered ones)
+  // Calculate stats from date-filtered submissions
   const stats = React.useMemo(() => {
-    const total = allSubmissions.length;
-    const passed = allSubmissions.filter(s => s.status === 'passed');
-    const failed = allSubmissions.filter(s => s.status === 'failed');
-    const errored = allSubmissions.filter(s => s.status === 'errored');
-    const skipped = allSubmissions.filter(s => s.status === 'skipped');
+    const total = statsSubmissions.length;
+    const passed = statsSubmissions.filter(s => s.status === 'passed');
+    const failed = statsSubmissions.filter(s => s.status === 'failed');
+    const errored = statsSubmissions.filter(s => s.status === 'errored');
+    const skipped = statsSubmissions.filter(s => s.status === 'skipped');
     const needAttention = [...failed, ...errored];
 
     return { 
@@ -133,7 +140,7 @@ const TeamLeadHome = () => {
         names: needAttention.map(s => s.testName)
       }
     };
-  }, [allSubmissions]); // Use allSubmissions for stats calculation
+  }, [statsSubmissions]); // Use date-filtered submissions for stats calculation
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -219,8 +226,10 @@ const TeamLeadHome = () => {
               </div>
             </div>
             <div className="text-right">
-              <p className="text-sm text-muted-foreground">Total Submissions</p>
-              <p className="text-3xl font-bold text-primary">{pagination.totalCount || 0}</p>
+              <p className="text-sm text-muted-foreground">
+                {selectedDate ? `Submissions on ${formatDate(selectedDate)}` : 'Total Submissions'}
+              </p>
+              <p className="text-3xl font-bold text-primary">{statsPagination.totalCount || stats.total}</p>
             </div>
           </div>
         </CardContent>
@@ -317,7 +326,7 @@ const TeamLeadHome = () => {
           </Link>
         </CardHeader>
         <CardContent>
-          {(submissionsLoading || allSubmissionsLoading) ? (
+          {(submissionsLoading || statsSubmissionsLoading) ? (
             <div className="space-y-4">
               {[1, 2, 3].map(i => (
                 <Skeleton key={i} className="h-16 w-full" />
