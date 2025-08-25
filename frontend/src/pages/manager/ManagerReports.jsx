@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Ca
 import { Button } from '../../components/ui/Button';
 import { Select } from '../../components/ui/Select';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import MonthPicker from '../../components/ui/MonthPicker';
 
 // API
 import { managerAPI } from '../../services/api';
@@ -20,7 +21,7 @@ const ManagerReports = () => {
   const navigate = useNavigate();
   const { error } = useToast();
   
-  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
+  const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [selectedTeam, setSelectedTeam] = useState('');
 
   // Fetch teams for filter
@@ -74,12 +75,12 @@ const ManagerReports = () => {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="text-sm font-medium mb-2 block">Month</label>
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="input w-full"
+              <MonthPicker
+                label="Month"
+                selected={selectedMonth}
+                onChange={setSelectedMonth}
+                placeholder="Select month"
+                maxDate={new Date()}
               />
             </div>
             

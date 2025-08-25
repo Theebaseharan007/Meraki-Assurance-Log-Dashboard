@@ -162,7 +162,8 @@ submissionSchema.statics.getRunsForDate = async function(managerId, date, team =
   };
 
   if (team) {
-    query.team = team;
+    // Case-insensitive team matching
+    query.team = new RegExp(`^${team}$`, 'i');
   }
 
   return await this.find(query)

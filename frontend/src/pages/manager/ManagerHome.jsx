@@ -10,6 +10,7 @@ import { Button } from '../../components/ui/Button';
 import { Select } from '../../components/ui/Select';
 import { Badge } from '../../components/ui/Badge';
 import LoadingSpinner, { Skeleton } from '../../components/ui/LoadingSpinner';
+import DatePicker from '../../components/ui/DatePicker';
 
 // Chart Components
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
@@ -20,7 +21,7 @@ import { useToast } from '../../components/ui/Toaster';
 import { formatDate, formatTime, getChartColor, capitalizeFirst } from '../../utils/format';
 
 const ManagerHome = () => {
-  const [selectedDate, setSelectedDate] = useState(format(startOfToday(), 'yyyy-MM-dd'));
+  const [selectedDate, setSelectedDate] = useState(startOfToday());
   const [selectedTeam, setSelectedTeam] = useState('');
   const [selectedRun, setSelectedRun] = useState(null); // Track selected submission for chart
   const { success, error } = useToast();
@@ -37,9 +38,9 @@ const ManagerHome = () => {
 
   // Fetch runs for selected date/team
   const { data: runsData, isLoading: runsLoading, refetch: refetchRuns } = useQuery({
-    queryKey: ['manager-runs', selectedDate, selectedTeam],
+    queryKey: ['manager-runs', format(selectedDate, 'yyyy-MM-dd'), selectedTeam],
     queryFn: () => managerAPI.getRuns({ 
-      date: selectedDate, 
+      date: format(selectedDate, 'yyyy-MM-dd'), 
       ...(selectedTeam && { team: selectedTeam })
     }),
     enabled: !!selectedDate,
@@ -233,12 +234,12 @@ const ManagerHome = () => {
           <div className="flex flex-col sm:flex-row gap-4">
             {/* Date Filter */}
             <div className="flex-1">
-              <label className="text-sm font-medium mb-2 block">Date</label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="input w-full"
+              <DatePicker
+                label="Date"
+                selected={selectedDate}
+                onChange={setSelectedDate}
+                placeholder="Select date"
+                maxDate={new Date()}
               />
             </div>
             

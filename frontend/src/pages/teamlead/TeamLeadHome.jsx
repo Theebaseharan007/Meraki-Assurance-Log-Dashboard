@@ -30,6 +30,40 @@ const TeamLeadHome = () => {
   const { user } = useAuth();
   const { error } = useToast();
 
+  // Custom tooltip component for stats cards
+  const StatsTooltip = ({ title, count, names, children }) => {
+    const [showTooltip, setShowTooltip] = React.useState(false);
+
+    if (count === 0) return children;
+
+    return (
+      <div 
+        className="relative"
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+      >
+        {children}
+        {showTooltip && (
+          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-50">
+            <div className="bg-popover border rounded-lg p-3 shadow-lg max-w-xs">
+              <p className="font-medium text-sm mb-2">{title}: {count}</p>
+              {names.length > 0 && (
+                <div className="text-xs space-y-1 max-h-32 overflow-y-auto">
+                  {names.slice(0, 10).map((name, index) => (
+                    <p key={index} className="truncate">{name}</p>
+                  ))}
+                  {names.length > 10 && (
+                    <p className="text-muted-foreground">... and {names.length - 10} more</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // Fetch recent submissions
   const { data: submissionsData, isLoading: submissionsLoading } = useQuery({
     queryKey: ['my-submissions', { page: 1, limit: 5 }],
@@ -43,15 +77,38 @@ const TeamLeadHome = () => {
   const submissions = submissionsData?.data?.data?.submissions || [];
   const pagination = submissionsData?.data?.data?.pagination || {};
 
-  // Calculate stats from submissions
+  // Calculate stats from submissions with test names
   const stats = React.useMemo(() => {
     const total = submissions.length;
-    const passed = submissions.filter(s => s.status === 'passed').length;
-    const failed = submissions.filter(s => s.status === 'failed').length;
-    const errored = submissions.filter(s => s.status === 'errored').length;
-    const skipped = submissions.filter(s => s.status === 'skipped').length;
+    const passed = submissions.filter(s => s.status === 'passed');
+    const failed = submissions.filter(s => s.status === 'failed');
+    const errored = submissions.filter(s => s.status === 'errored');
+    const skipped = submissions.filter(s => s.status === 'skipped');
+    const needAttention = [...failed, ...errored];
 
-    return { total, passed, failed, errored, skipped };
+    return { 
+      total, 
+      passed: {
+        count: passed.length,
+        names: passed.map(s => s.testName)
+      },
+      failed: {
+        count: failed.length,
+        names: failed.map(s => s.testName)
+      },
+      errored: {
+        count: errored.length,
+        names: errored.map(s => s.testName)
+      },
+      skipped: {
+        count: skipped.length,
+        names: skipped.map(s => s.testName)
+      },
+      needAttention: {
+        count: needAttention.length,
+        names: needAttention.map(s => s.testName)
+      }
+    };
   }, [submissions]);
 
   const getStatusIcon = (status) => {
@@ -123,29 +180,41 @@ const TeamLeadHome = () => {
           </CardContent>
         </Card>
         
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Successful</p>
-                <p className="text-2xl font-bold text-green-600">{stats.passed}</p>
+        <StatsTooltip 
+          title="Successful Runs" 
+          count={stats.passed.count} 
+          names={stats.passed.names}
+        >
+          <Card className="cursor-help">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Successful</p>
+                  <p className="text-2xl font-bold text-green-600">{stats.passed.count}</p>
+                </div>
+                <CheckCircle className="h-8 w-8 text-green-500" />
               </div>
-              <CheckCircle className="h-8 w-8 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </StatsTooltip>
         
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Need Attention</p>
-                <p className="text-2xl font-bold text-orange-600">{stats.failed + stats.errored}</p>
+        <StatsTooltip 
+          title="Runs Needing Attention" 
+          count={stats.needAttention.count} 
+          names={stats.needAttention.names}
+        >
+          <Card className="cursor-help">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Need Attention</p>
+                  <p className="text-2xl font-bold text-orange-600">{stats.needAttention.count}</p>
+                </div>
+                <AlertCircle className="h-8 w-8 text-orange-500" />
               </div>
-              <AlertCircle className="h-8 w-8 text-orange-500" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </StatsTooltip>
       </div>
 
       {/* Quick Actions */}

@@ -21,6 +21,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import DateTimePicker from '../../components/ui/DateTimePicker';
 
 // API
 import { submissionAPI } from '../../services/api';
@@ -56,7 +57,7 @@ const SubmitRun = () => {
   const [formData, setFormData] = useState({
     team: user?.team || '',
     testName: '',
-    timestamp: new Date().toISOString().split('T')[0], // Default to today
+    timestamp: new Date(), // Default to today as Date object
     sections: [
       {
         id: Math.random().toString(36).substr(2, 9),
@@ -85,7 +86,7 @@ const SubmitRun = () => {
       setFormData({
         team: submission.team || '',
         testName: submission.testName || '',
-        timestamp: submission.timestamp ? submission.timestamp.split('T')[0] : new Date().toISOString().split('T')[0],
+        timestamp: submission.timestamp ? new Date(submission.timestamp) : new Date(),
         sections: submission.sections?.map(section => ({
           id: Math.random().toString(36).substr(2, 9),
           name: section.name || '',
@@ -173,7 +174,7 @@ const SubmitRun = () => {
       newErrors.team = 'Team name is required';
     }
 
-    if (!formData.timestamp) {
+    if (!formData.timestamp || !(formData.timestamp instanceof Date)) {
       newErrors.timestamp = 'Test date is required';
     }
     
@@ -202,7 +203,7 @@ const SubmitRun = () => {
     const submissionData = {
       team: formData.team.trim(),
       testName: formData.testName.trim(),
-      timestamp: formData.timestamp,
+      timestamp: formData.timestamp.toISOString(), // Convert Date to ISO string
       sections: formData.sections.map(section => ({
         name: section.name.trim(),
         result: section.result,
@@ -395,27 +396,22 @@ const SubmitRun = () => {
                 required
               />
 
-              <div>
-                <label className="text-sm font-medium mb-2 block flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Test Date
-                </label>
-                <input
-                  type="date"
-                  value={formData.timestamp}
-                  onChange={(e) => {
-                    setFormData(prev => ({ ...prev, timestamp: e.target.value }));
-                    if (errors.timestamp) {
-                      setErrors(prev => ({ ...prev, timestamp: undefined }));
-                    }
-                  }}
-                  className={`input w-full ${errors.timestamp ? 'border-red-500' : ''}`}
-                  required
-                />
-                {errors.timestamp && (
-                  <p className="text-sm text-red-500 mt-1">{errors.timestamp}</p>
-                )}
-              </div>
+              <DateTimePicker
+                label="Test Date & Time"
+                selected={formData.timestamp}
+                onChange={(date) => {
+                  setFormData(prev => ({ ...prev, timestamp: date }));
+                  if (errors.timestamp) {
+                    setErrors(prev => ({ ...prev, timestamp: undefined }));
+                  }
+                }}
+                placeholder="Select test date and time"
+                error={errors.timestamp}
+                maxDate={new Date()}
+                showTimeSelect={true}
+                timeIntervals={15}
+                dateFormat="MMM dd, yyyy h:mm aa"
+              />
             </div>
           </CardContent>
         </Card>

@@ -3,6 +3,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import react-datepicker CSS */
+@import 'react-datepicker/dist/react-datepicker.css';
+
 @layer base {
   :root {
     --background: 0 0% 100%;

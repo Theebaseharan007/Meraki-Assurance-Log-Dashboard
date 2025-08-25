@@ -194,7 +194,7 @@ const MySubmissions = () => {
                           <h3 className="font-semibold text-lg">{submission.testName}</h3>
                           <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
                             <span className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
+                              <Calendar className="h-3 w-3 text-gray-600 dark:text-gray-300" />
                               {formatDate(submission.timestamp)}
                             </span>
                             <span>{formatTime(submission.timestamp)}</span>
