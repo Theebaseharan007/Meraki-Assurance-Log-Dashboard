@@ -62,6 +62,12 @@ const submissionSchema = new mongoose.Schema({
     trim: true,
     maxlength: [200, 'Test name cannot exceed 200 characters']
   },
+  description: {
+    type: String,
+    trim: true,
+    maxlength: [1000, 'Description cannot exceed 1000 characters'],
+    default: ''
+  },
   sections: {
     type: [sectionSchema],
     required: [true, 'At least one section is required'],

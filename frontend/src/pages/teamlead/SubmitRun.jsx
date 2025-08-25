@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Ca
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
+import { Textarea } from '../../components/ui/Textarea';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import DateTimePicker from '../../components/ui/DateTimePicker';
 
@@ -57,6 +58,7 @@ const SubmitRun = () => {
   const [formData, setFormData] = useState({
     team: user?.team || '',
     testName: '',
+    description: '',
     timestamp: new Date(), // Default to today as Date object
     sections: [
       {
@@ -86,6 +88,7 @@ const SubmitRun = () => {
       setFormData({
         team: submission.team || '',
         testName: submission.testName || '',
+        description: submission.description || '',
         timestamp: submission.timestamp ? new Date(submission.timestamp) : new Date(),
         sections: submission.sections?.map(section => ({
           id: Math.random().toString(36).substr(2, 9),
@@ -203,6 +206,7 @@ const SubmitRun = () => {
     const submissionData = {
       team: formData.team.trim(),
       testName: formData.testName.trim(),
+      description: formData.description.trim(),
       timestamp: formData.timestamp.toISOString(), // Convert Date to ISO string
       sections: formData.sections.map(section => ({
         name: section.name.trim(),
@@ -411,6 +415,23 @@ const SubmitRun = () => {
                 showTimeSelect={true}
                 timeIntervals={15}
                 dateFormat="MMM dd, yyyy h:mm aa"
+              />
+            </div>
+
+            {/* Description */}
+            <div className="col-span-full">
+              <Textarea
+                label="Description (Optional)"
+                placeholder="Add any additional details about this test run..."
+                value={formData.description}
+                onChange={(e) => {
+                  setFormData(prev => ({ ...prev, description: e.target.value }));
+                  if (errors.description) {
+                    setErrors(prev => ({ ...prev, description: undefined }));
+                  }
+                }}
+                error={errors.description}
+                rows={3}
               />
             </div>
           </CardContent>
