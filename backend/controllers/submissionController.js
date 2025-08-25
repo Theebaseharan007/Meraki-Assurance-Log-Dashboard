@@ -6,7 +6,8 @@ import User from '../models/User.js';
 // @access  Private (Team Lead only)
 export const createSubmission = async (req, res) => {
   try {
-    const { team, testName, sections, timestamp } = req.body;
+    console.log('Create submission request body:', req.body); // Debug log
+    const { team, testName, sections, timestamp, status, description } = req.body;
     const leadId = req.user._id;
 
     // Get the team lead's manager
@@ -24,13 +25,17 @@ export const createSubmission = async (req, res) => {
       leadId,
       managerId: teamLead.managerId._id,
       testName,
-      sections
+      sections,
+      status, // Include the explicit status
+      description: description || '' // Include description with default
     };
 
     // Set custom timestamp if provided
     if (timestamp) {
       submissionData.timestamp = new Date(timestamp);
     }
+
+    console.log('Final submission data:', submissionData); // Debug log
 
     // Create submission
     const submission = await Submission.create(submissionData);
@@ -48,8 +53,11 @@ export const createSubmission = async (req, res) => {
 
   } catch (error) {
     console.error('Create submission error:', error);
+    console.error('Error name:', error.name); // Debug log
+    console.error('Error message:', error.message); // Debug log
 
     if (error.name === 'ValidationError') {
+      console.error('Validation errors:', error.errors); // Debug log
       const validationErrors = Object.values(error.errors).map(err => ({
         field: err.path,
         message: err.message
@@ -75,13 +83,26 @@ export const createSubmission = async (req, res) => {
 export const getMySubmissions = async (req, res) => {
   try {
     const leadId = req.user._id;
-    const { page = 1, limit = 10, search } = req.query;
+    const { page = 1, limit = 10, search, date } = req.query;
 
     // Build query
     const query = { leadId };
     
     if (search) {
       query.testName = { $regex: search, $options: 'i' };
+    }
+
+    // Add date filtering if provided
+    if (date) {
+      const startDate = new Date(date);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(date);
+      endDate.setHours(23, 59, 59, 999);
+      
+      query.timestamp = {
+        $gte: startDate,
+        $lte: endDate
+      };
     }
 
     // Calculate pagination
@@ -177,7 +198,7 @@ export const getSubmissionById = async (req, res) => {
 export const updateSubmission = async (req, res) => {
   try {
     const { id } = req.params;
-    const { team, testName, sections, timestamp } = req.body;
+    const { team, testName, sections, timestamp, status, description } = req.body;
     const leadId = req.user._id;
 
     // Find submission (ensure ownership)
@@ -199,6 +220,8 @@ export const updateSubmission = async (req, res) => {
     if (testName !== undefined) updates.testName = testName;
     if (sections !== undefined) updates.sections = sections;
     if (timestamp !== undefined) updates.timestamp = new Date(timestamp);
+    if (status !== undefined) updates.status = status;
+    if (description !== undefined) updates.description = description;
 
     // Update submission
     const updatedSubmission = await Submission.findByIdAndUpdate(

@@ -70,17 +70,13 @@ const submissionSchema = new mongoose.Schema({
   },
   sections: {
     type: [sectionSchema],
-    required: [true, 'At least one section is required'],
-    validate: {
-      validator: function(sections) {
-        return sections && sections.length > 0;
-      },
-      message: 'At least one section is required'
-    }
+    default: []
+    // Sections are now optional - can be empty array
   },
   status: {
     type: String,
-    enum: ['passed', 'failed', 'skipped', 'errored']
+    enum: ['passed', 'failed', 'skipped', 'errored'],
+    default: 'passed'
     // Status is calculated automatically in pre-save middleware, not required in input
   },
   timestamp: {
@@ -113,12 +109,24 @@ submissionSchema.index({
 
 // Pre-save middleware to calculate status from sections/subsections
 submissionSchema.pre('save', function(next) {
-  this.status = this.calculateAggregateStatus();
+  console.log('Pre-save middleware - current status:', this.status); // Debug log
+  console.log('Pre-save middleware - sections length:', this.sections?.length); // Debug log
+  
+  // If status is not explicitly set, calculate it from sections
+  if (!this.status) {
+    this.status = this.calculateAggregateStatus();
+    console.log('Calculated status:', this.status); // Debug log
+  }
   next();
 });
 
 // Method to calculate aggregate status
 submissionSchema.methods.calculateAggregateStatus = function() {
+  // If no sections, return 'passed' as default
+  if (!this.sections || this.sections.length === 0) {
+    return 'passed';
+  }
+
   const statusPriority = {
     'errored': 4,
     'failed': 3,
@@ -139,7 +147,7 @@ submissionSchema.methods.calculateAggregateStatus = function() {
     }
 
     // Check subsection results
-    for (const subsection of section.subsections) {
+    for (const subsection of section.subsections || []) {
       const subsectionPriority = statusPriority[subsection.result];
       if (subsectionPriority > worstPriority) {
         worstStatus = subsection.result;

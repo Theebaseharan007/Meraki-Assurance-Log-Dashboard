@@ -59,18 +59,14 @@ const SubmitRun = () => {
     team: user?.team || '',
     testName: '',
     description: '',
+    result: 'passed', // Overall result for the submission
     timestamp: new Date(), // Default to today as Date object
-    sections: [
-      {
-        id: Math.random().toString(36).substr(2, 9),
-        name: '',
-        result: 'passed',
-        subsections: []
-      }
-    ]
+    sections: [] // Start with empty sections since enableSections defaults to false
   });
 
   const [errors, setErrors] = useState({});
+  const [enableSections, setEnableSections] = useState(false); // Control whether sections are enabled, default to false for cleaner UX
+  const [hasSubmitted, setHasSubmitted] = useState(false); // Track if form has been submitted at least once
 
   // Fetch submission data when editing
   const { data: submissionData, isLoading: isLoadingSubmission } = useQuery({
@@ -89,6 +85,7 @@ const SubmitRun = () => {
         team: submission.team || '',
         testName: submission.testName || '',
         description: submission.description || '',
+        result: submission.status || 'passed', // Use status as result
         timestamp: submission.timestamp ? new Date(submission.timestamp) : new Date(),
         sections: submission.sections?.map(section => ({
           id: Math.random().toString(36).substr(2, 9),
@@ -108,6 +105,9 @@ const SubmitRun = () => {
           }
         ]
       });
+      
+      // Set enableSections based on whether submission has sections
+      setEnableSections(submission.sections && submission.sections.length > 0);
     }
   }, [submissionData, isEditing]);
 
@@ -127,6 +127,8 @@ const SubmitRun = () => {
       navigate('/teamlead/submissions');
     },
     onError: (err) => {
+      console.error('Create submission error:', err); // Debug log
+      console.error('Error response:', err.response?.data); // Debug log
       const errorMessage = err.response?.data?.message || 'Failed to submit test run';
       error(errorMessage);
       
@@ -150,6 +152,8 @@ const SubmitRun = () => {
       navigate('/teamlead/submissions');
     },
     onError: (err) => {
+      console.error('Update submission error:', err); // Debug log
+      console.error('Error response:', err.response?.data); // Debug log
       const errorMessage = err.response?.data?.message || 'Failed to update test run';
       error(errorMessage);
       
@@ -166,57 +170,114 @@ const SubmitRun = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     
+    // Mark that form has been submitted
+    setHasSubmitted(true);
+    
     // Validation
     const newErrors = {};
     
-    if (!formData.testName.trim()) {
-      newErrors.testName = 'Test name is required';
-    }
+    console.log('=== VALIDATION DEBUG ==='); // Debug log
+    console.log('Form data:', formData); // Debug log
+    console.log('Enable sections:', enableSections); // Debug log
     
     if (!formData.team.trim()) {
+      console.log('❌ Team validation failed'); // Debug log
       newErrors.team = 'Team name is required';
     }
 
+    if (!formData.testName.trim()) {
+      console.log('❌ Test name validation failed'); // Debug log
+      newErrors.testName = 'Test/Run name is required';
+    }
+
+    if (!formData.result || !['passed', 'failed', 'skipped', 'errored'].includes(formData.result)) {
+      console.log('❌ Result validation failed, result:', formData.result); // Debug log
+      newErrors.result = 'Overall result is required';
+    }
+
     if (!formData.timestamp || !(formData.timestamp instanceof Date)) {
+      console.log('❌ Timestamp validation failed, timestamp:', formData.timestamp); // Debug log
       newErrors.timestamp = 'Test date is required';
     }
     
-    if (formData.sections.length === 0) {
-      newErrors.sections = 'At least one section is required';
+    // Only validate sections if they are enabled AND have content
+    if (enableSections) {
+      console.log('Validating sections...'); // Debug log
+      
+      // Check if sections are enabled but empty
+      if (formData.sections.length === 0) {
+        console.log('❌ Sections validation failed - enabled but empty'); // Debug log
+        newErrors.sections = 'At least one section is required when sections are enabled';
+      } else {
+        // Validate individual sections only if they exist
+        formData.sections.forEach((section, sIndex) => {
+          if (!section.name.trim()) {
+            console.log(`❌ Section ${sIndex} name validation failed`); // Debug log
+            newErrors[`section_${sIndex}_name`] = 'Section name is required';
+          }
+          
+          section.subsections.forEach((subsection, subIndex) => {
+            if (!subsection.name.trim()) {
+              console.log(`❌ Subsection ${sIndex}-${subIndex} name validation failed`); // Debug log
+              newErrors[`subsection_${sIndex}_${subIndex}_name`] = 'Subsection name is required';
+            }
+          });
+        });
+      }
     }
     
-    formData.sections.forEach((section, sIndex) => {
-      if (!section.name.trim()) {
-        newErrors[`section_${sIndex}_name`] = 'Section name is required';
-      }
-      
-      section.subsections.forEach((subsection, subIndex) => {
-        if (!subsection.name.trim()) {
-          newErrors[`subsection_${sIndex}_${subIndex}_name`] = 'Subsection name is required';
-        }
-      });
-    });
+    console.log('Validation errors:', newErrors); // Debug log
+    console.log('=== END VALIDATION DEBUG ==='); // Debug log
     
     if (Object.keys(newErrors).length > 0) {
+      console.log('❌ Frontend validation failed, not submitting'); // Debug log
       setErrors(newErrors);
       return;
     }
+    
+    // TEMPORARY: For debugging, let's see what happens if we bypass some validation
+    console.log('Current form state:');
+    console.log('- Team:', formData.team);
+    console.log('- Test Name:', formData.testName);
+    console.log('- Result:', formData.result);
+    console.log('- Timestamp:', formData.timestamp);
+    console.log('- Description:', formData.description);
+    console.log('- Sections enabled:', enableSections);
+    console.log('- Sections count:', formData.sections?.length);
 
-    // Clean up the data before submission
+    console.log('✅ Frontend validation passed, proceeding to submit'); // Debug log
+
+    // Clean up the data before submission - SIMPLIFIED
     const submissionData = {
       team: formData.team.trim(),
       testName: formData.testName.trim(),
-      description: formData.description.trim(),
+      description: formData.description?.trim() || '', // Safe handling
+      status: formData.result, // Use result as status
       timestamp: formData.timestamp.toISOString(), // Convert Date to ISO string
-      sections: formData.sections.map(section => ({
-        name: section.name.trim(),
-        result: section.result,
-        subsections: section.subsections.map(subsection => ({
-          name: subsection.name.trim(),
-          result: subsection.result
-        }))
-      }))
+      sections: [] // Always empty array when sections are disabled
     };
+
+    // Only add sections if they are enabled and have valid data
+    if (enableSections && formData.sections && formData.sections.length > 0) {
+      submissionData.sections = formData.sections
+        .filter(section => section.name.trim()) // Only include sections with names
+        .map(section => ({
+          name: section.name.trim(),
+          result: section.result,
+          subsections: section.subsections
+            .filter(subsection => subsection.name.trim()) // Only include subsections with names
+            .map(subsection => ({
+              name: subsection.name.trim(),
+              result: subsection.result
+            }))
+        }));
+    }
+
+    console.log('=== SUBMISSION DATA ==='); // Debug log
+    console.log('Submitting data:', JSON.stringify(submissionData, null, 2)); // Debug log
+    console.log('Enable sections:', enableSections); // Debug log
+    console.log('Form sections length:', formData.sections?.length); // Debug log
+    console.log('=== END SUBMISSION DATA ==='); // Debug log
 
     if (isEditing) {
       updateSubmissionMutation.mutate(submissionData);
@@ -371,7 +432,7 @@ const SubmitRun = () => {
             <CardTitle>Basic Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <Input
                 label="Team Name"
                 placeholder="Enter team name"
@@ -385,7 +446,7 @@ const SubmitRun = () => {
                 error={errors.team}
                 required
               />
-              
+
               <Input
                 label="Test/Run Name"
                 placeholder="Enter test or run name"
@@ -398,6 +459,25 @@ const SubmitRun = () => {
                 }}
                 error={errors.testName}
                 required
+              />
+
+              <Select
+                label="Overall Result"
+                placeholder="Select result"
+                options={[
+                  { value: 'passed', label: 'Passed' },
+                  { value: 'failed', label: 'Failed' },
+                  { value: 'skipped', label: 'Skipped' },
+                  { value: 'errored', label: 'Errored' }
+                ]}
+                value={formData.result}
+                onValueChange={(value) => {
+                  setFormData(prev => ({ ...prev, result: value }));
+                  if (errors.result) {
+                    setErrors(prev => ({ ...prev, result: undefined }));
+                  }
+                }}
+                error={errors.result}
               />
 
               <DateTimePicker
@@ -434,10 +514,60 @@ const SubmitRun = () => {
                 rows={3}
               />
             </div>
+
+            {/* Enable Sections Checkbox */}
+            <div className="col-span-full">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="enableSections"
+                  checked={enableSections}
+                  onChange={(e) => {
+                    setEnableSections(e.target.checked);
+                    
+                    // Clear any existing section-related errors when checkbox changes
+                    setErrors(prev => {
+                      const newErrors = { ...prev };
+                      delete newErrors.sections;
+                      // Clear any section-specific errors
+                      Object.keys(newErrors).forEach(key => {
+                        if (key.startsWith('section_') || key.startsWith('subsection_')) {
+                          delete newErrors[key];
+                        }
+                      });
+                      return newErrors;
+                    });
+
+                    if (!e.target.checked) {
+                      // Clear sections completely when disabled
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        sections: []
+                      }));
+                    } else {
+                      // Don't add a default section immediately - let user add manually
+                      // This prevents immediate validation errors
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        sections: []
+                      }));
+                    }
+                  }}
+                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                />
+                <label htmlFor="enableSections" className="text-sm font-medium">
+                  Add detailed test sections (optional)
+                </label>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Check this if you want to add specific test sections with individual results
+              </p>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Sections */}
+        {/* Sections - Only show when enabled */}
+        {enableSections && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Test Sections</CardTitle>
@@ -570,6 +700,7 @@ const SubmitRun = () => {
             )}
           </CardContent>
         </Card>
+        )}
 
         {/* Submit Button */}
         <div className="flex justify-end gap-4">

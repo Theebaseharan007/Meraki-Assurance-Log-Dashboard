@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Ca
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import LoadingSpinner, { Skeleton } from '../../components/ui/LoadingSpinner';
+import DatePicker from '../../components/ui/DatePicker';
 
 // API
 import { submissionAPI } from '../../services/api';
@@ -29,6 +30,7 @@ import { formatDate, formatTime, capitalizeFirst } from '../../utils/format';
 const TeamLeadHome = () => {
   const { user } = useAuth();
   const { error } = useToast();
+  const [selectedDate, setSelectedDate] = useState(new Date()); // Default to today
 
   // Custom tooltip component for stats cards
   const StatsTooltip = ({ title, count, names, children }) => {
@@ -64,10 +66,29 @@ const TeamLeadHome = () => {
     );
   };
 
-  // Fetch recent submissions
+  // Format selected date for API call (YYYY-MM-DD)
+  const formattedDate = selectedDate ? selectedDate.toISOString().split('T')[0] : null;
+
+  // Fetch ALL submissions for stats calculation (no pagination)
+  const { data: allSubmissionsData, isLoading: allSubmissionsLoading } = useQuery({
+    queryKey: ['my-all-submissions'],
+    queryFn: () => submissionAPI.getMine({ page: 1, limit: 1000 }), // Get all submissions
+    onError: (err) => {
+      error('Failed to load submissions data');
+      console.error('All submissions fetch error:', err);
+    }
+  });
+
+  // Fetch recent submissions for the selected date
   const { data: submissionsData, isLoading: submissionsLoading } = useQuery({
-    queryKey: ['my-submissions', { page: 1, limit: 5 }],
-    queryFn: () => submissionAPI.getMine({ page: 1, limit: 5 }),
+    queryKey: ['my-submissions', { page: 1, limit: 5, date: formattedDate }],
+    queryFn: () => {
+      const params = { page: 1, limit: 5 };
+      if (formattedDate) {
+        params.date = formattedDate;
+      }
+      return submissionAPI.getMine(params);
+    },
     onError: (err) => {
       error('Failed to load recent submissions');
       console.error('Submissions fetch error:', err);
@@ -76,14 +97,17 @@ const TeamLeadHome = () => {
 
   const submissions = submissionsData?.data?.data?.submissions || [];
   const pagination = submissionsData?.data?.data?.pagination || {};
+  
+  // Get ALL submissions for stats calculation
+  const allSubmissions = allSubmissionsData?.data?.data?.submissions || [];
 
-  // Calculate stats from submissions with test names
+  // Calculate stats from ALL submissions (not just recent/filtered ones)
   const stats = React.useMemo(() => {
-    const total = submissions.length;
-    const passed = submissions.filter(s => s.status === 'passed');
-    const failed = submissions.filter(s => s.status === 'failed');
-    const errored = submissions.filter(s => s.status === 'errored');
-    const skipped = submissions.filter(s => s.status === 'skipped');
+    const total = allSubmissions.length;
+    const passed = allSubmissions.filter(s => s.status === 'passed');
+    const failed = allSubmissions.filter(s => s.status === 'failed');
+    const errored = allSubmissions.filter(s => s.status === 'errored');
+    const skipped = allSubmissions.filter(s => s.status === 'skipped');
     const needAttention = [...failed, ...errored];
 
     return { 
@@ -109,7 +133,7 @@ const TeamLeadHome = () => {
         names: needAttention.map(s => s.testName)
       }
     };
-  }, [submissions]);
+  }, [allSubmissions]); // Use allSubmissions for stats calculation
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -139,6 +163,42 @@ const TeamLeadHome = () => {
           </Button>
         </Link>
       </div>
+
+      {/* Date Filter */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5" />
+            Filter Submissions by Date
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
+            <div className="flex-1 max-w-xs">
+              <DatePicker
+                label="Select Date"
+                selected={selectedDate}
+                onChange={(date) => {
+                  console.log('Date selected:', date); // Debug log
+                  setSelectedDate(date);
+                }}
+                placeholder="Select date to filter submissions"
+                maxDate={new Date()}
+                showMonthDropdown={true}
+                showYearDropdown={true}
+                dropdownMode="select"
+              />
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {selectedDate ? (
+                <>Showing submissions for {formatDate(selectedDate)}</>
+              ) : (
+                <>Showing all recent submissions</>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* User Info Card */}
       <Card>
@@ -257,7 +317,7 @@ const TeamLeadHome = () => {
           </Link>
         </CardHeader>
         <CardContent>
-          {submissionsLoading ? (
+          {(submissionsLoading || allSubmissionsLoading) ? (
             <div className="space-y-4">
               {[1, 2, 3].map(i => (
                 <Skeleton key={i} className="h-16 w-full" />
